@@ -86,7 +86,7 @@
     <canvas id="board"></canvas>
     <div id="overlay">
       <h2 id="ovTitle">BLOCKFALL TYCOON</h2>
-      <p id="ovText">Build your property empire.<br>Complete a row to collect a payday!</p>
+      <p id="ovText">Every block carries a cash prize.<br>Land it safely to bank it, plus 1% interest<br>on your balance for every block.<br>Complete a row for a payday!</p>
       <button id="startBtn">Start Building</button>
     </div>
   </div>
@@ -114,7 +114,11 @@
   const holdCtx = document.getElementById('hold').getContext('2d');
   const nextCtx = document.getElementById('next').getContext('2d');
   const $ = id => document.getElementById(id);
-  const money = n => '$' + n.toLocaleString('en-US');
+  const money = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const cents = n => Math.round(n * 100) / 100;
+  const INTEREST = 0.01;
+  // Every block is worth a random $10 - $500, in steps of $10.
+  const randomValue = () => (Math.floor(Math.random() * 50) + 1) * 10;
 
   let CELL = 30;
   function sizeBoard() {
@@ -147,9 +151,13 @@
 
   const KICKS = [[0,0],[-1,0],[1,0],[0,-1],[-2,0],[2,0]];
 
-  let grid, cur, holdType, canHold, queue, score, lines, level, best;
+  let grid, cur, held, canHold, queue, score, lines, level, best;
   let dropTimer = 0, lastTime = 0, running = false, paused = false, over = false;
-  let lockDelay = 0, clearing = null, payday = null;
+  let lockDelay = 0, clearing = null, popups = [];
+
+  function popup(text, row, color) {
+    popups.push({ text, y: row * CELL, t: 0, color });
+  }
 
   try { best = +localStorage.getItem('blockfall-best') || 0; } catch { best = 0; }
   $('best').textContent = money(best);
@@ -163,12 +171,12 @@
     return b;
   }
 
-  function spawn(type) {
+  function spawn(type, value) {
     if (!type) {
       while (queue.length < 7) queue.push(...bag());
       type = queue.shift();
     }
-    cur = { type, cells: PIECES[type].cells.map(c => [...c]), x: 3, y: type === 'I' ? -1 : 0 };
+    cur = { type, value: value || randomValue(), cells: PIECES[type].cells.map(c => [...c]), x: 3, y: type === 'I' ? -1 : 0 };
     lockDelay = 0;
     if (collides(cur.cells, cur.x, cur.y)) gameOver();
   }
@@ -206,17 +214,16 @@
   }
 
   function hardDrop() {
-    const y = ghostY();
-    score += (y - cur.y) * 2;
-    cur.y = y;
+    cur.y = ghostY();
     lock();
   }
 
   function hold() {
     if (!canHold) return;
-    const t = cur.type;
-    if (holdType) spawn(holdType); else spawn();
-    holdType = t; canHold = false;
+    const prev = held;
+    held = { type: cur.type, value: cur.value };
+    if (prev) spawn(prev.type, prev.value); else spawn();
+    canHold = false;
   }
 
   function lock() {
@@ -225,6 +232,12 @@
       if (gy < 0) { gameOver(); return; }
       grid[gy][x + cur.x] = cur.type;
     }
+    // Landed safely: bank the block's value, plus 1% interest on the existing balance.
+    const interest = cents(score * INTEREST);
+    score = cents(score + cur.value + interest);
+    const row = cur.y + Math.min(...cur.cells.map(c => c[1]));
+    popup('+' + money(cur.value), row, '#e9b949');
+    if (interest > 0) popup('+' + money(interest) + ' interest', row + 1, '#7fe0a8');
     const full = [];
     for (let y = 0; y < ROWS; y++) if (grid[y].every(Boolean)) full.push(y);
     if (full.length) {
@@ -248,9 +261,9 @@
     }
     const earned = [0, 100, 300, 500, 800][rows.length] * level;
     lines += rows.length;
-    score += earned;
+    score = cents(score + earned);
     level = Math.floor(lines / 10) + 1;
-    payday = { text: (rows.length === 4 ? 'JACKPOT! ' : 'PAYDAY! ') + '+' + money(earned), y: rows[0], t: 0 };
+    popup((rows.length === 4 ? 'JACKPOT! ' : 'PAYDAY! ') + '+' + money(earned), rows[0], '#e9b949');
   }
 
   function speed() { return Math.max(60, 800 * Math.pow(0.82, level - 1)); }
@@ -376,23 +389,43 @@
       ctx.setLineDash([]);
       for (const [x, y] of cur.cells)
         if (y + cur.y >= 0) drawCell(ctx, (x + cur.x) * CELL, (y + cur.y) * CELL, CELL, cur.type);
+      drawPriceTag();
     }
 
-    if (payday) {
-      const a = Math.max(0, 1 - payday.t / 1200);
-      const py = payday.y * CELL - payday.t * 0.04;
-      ctx.globalAlpha = a;
-      ctx.font = `bold ${Math.max(14, Math.round(CELL * 0.75))}px Georgia, serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineWidth = 4; ctx.strokeStyle = '#2a2418';
-      ctx.strokeText(payday.text, board.width / 2, py);
-      ctx.fillStyle = '#e9b949';
-      ctx.fillText(payday.text, board.width / 2, py);
-      ctx.globalAlpha = 1;
+    ctx.font = `bold ${Math.max(13, Math.round(CELL * 0.6))}px Georgia, serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4; ctx.strokeStyle = '#2a2418';
+    for (const p of popups) {
+      const py = Math.max(CELL / 2, p.y - p.t * 0.04);
+      ctx.globalAlpha = Math.max(0, 1 - p.t / 1200);
+      ctx.strokeText(p.text, board.width / 2, py);
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.text, board.width / 2, py);
     }
+    ctx.globalAlpha = 1;
 
-    drawMini(holdCtx, holdType ? [holdType] : [], 72, canHold ? 1 : 0.35);
+    drawMini(holdCtx, held ? [held.type] : [], 72, canHold ? 1 : 0.35);
     drawMini(nextCtx, queue ? queue.slice(0, 3) : [], 66, 1);
+  }
+
+  // Gold price tag floating just above the falling piece showing what it's worth.
+  function drawPriceTag() {
+    const text = '$' + cur.value;
+    const xs = cur.cells.map(c => c[0] + cur.x);
+    const cx = (Math.min(...xs) + Math.max(...xs) + 1) / 2 * CELL;
+    const top = (cur.y + Math.min(...cur.cells.map(c => c[1]))) * CELL;
+    const fs = Math.max(11, Math.round(CELL * 0.5));
+    ctx.font = `bold ${fs}px Georgia, serif`;
+    const w = ctx.measureText(text).width + fs * 0.8, h = fs * 1.4;
+    const ty = Math.max(h / 2 + 2, top - h / 2 - 3);
+    ctx.fillStyle = '#e9b949';
+    ctx.strokeStyle = '#2a2418';
+    ctx.lineWidth = 2;
+    ctx.fillRect(cx - w / 2, ty - h / 2, w, h);
+    ctx.strokeRect(cx - w / 2, ty - h / 2, w, h);
+    ctx.fillStyle = '#2a2418';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, cx, ty + 1);
   }
 
   function drawMini(c, types, slot, alpha) {
@@ -413,7 +446,8 @@
     const dt = Math.min(100, t - lastTime);
     lastTime = t;
     if (running && !paused && !over) {
-      if (payday) { payday.t += dt; if (payday.t > 1200) payday = null; }
+      popups.forEach(p => p.t += dt);
+      popups = popups.filter(p => p.t < 1200);
       if (clearing) {
         clearing.t += dt;
         if (clearing.t >= 300) { clearRows(clearing.rows); clearing = null; finishLock(); }
@@ -441,9 +475,9 @@
 
   function start() {
     grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-    queue = []; holdType = null; canHold = true;
+    queue = []; held = null; canHold = true;
     score = 0; lines = 0; level = 1;
-    over = false; paused = false; running = true; clearing = null; payday = null; dropTimer = 0;
+    over = false; paused = false; running = true; clearing = null; popups = []; dropTimer = 0;
     spawn();
     updateHud();
     $('overlay').classList.add('hidden');
@@ -468,7 +502,7 @@
     switch (a) {
       case 'left': move(-1, 0); break;
       case 'right': move(1, 0); break;
-      case 'soft': if (move(0, 1)) { score += 1; dropTimer = 0; updateHud(); } break;
+      case 'soft': if (move(0, 1)) dropTimer = 0; break;
       case 'rotate': rotate(1); break;
       case 'rotateBack': rotate(-1); break;
       case 'drop': hardDrop(); updateHud(); break;
