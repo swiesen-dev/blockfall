@@ -155,6 +155,39 @@
   let dropTimer = 0, lastTime = 0, running = false, paused = false, over = false;
   let lockDelay = 0, clearing = null, popups = [];
 
+  // Synthesized cash-register "cha-ching" played when a block lands.
+  let audio;
+  function chaChing() {
+    if (!audio) return;
+    const t = audio.currentTime;
+    const out = audio.createGain();
+    out.gain.value = 0.4;
+    out.connect(audio.destination);
+    // "cha": a short burst of filtered noise, like the drawer mechanism.
+    const len = Math.floor(audio.sampleRate * 0.08);
+    const buf = audio.createBuffer(1, len, audio.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const noise = audio.createBufferSource();
+    noise.buffer = buf;
+    const bp = audio.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 3500;
+    noise.connect(bp); bp.connect(out);
+    noise.start(t);
+    // "ching": bright bell tones ringing out.
+    const s = t + 0.09;
+    [[2093, 0.35], [2637, 0.35], [4186, 0.15]].forEach(([f, peak]) => {
+      const o = audio.createOscillator();
+      o.frequency.value = f;
+      const g = audio.createGain();
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(peak, s + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + 0.7);
+      o.connect(g); g.connect(out);
+      o.start(s); o.stop(s + 0.75);
+    });
+  }
+
   function popup(text, row, color) {
     popups.push({ text, y: row * CELL, t: 0, color });
   }
@@ -238,6 +271,7 @@
     const row = cur.y + Math.min(...cur.cells.map(c => c[1]));
     popup('+' + money(cur.value), row, '#e9b949');
     if (interest > 0) popup('+' + money(interest) + ' interest', row + 1, '#7fe0a8');
+    chaChing();
     const full = [];
     for (let y = 0; y < ROWS; y++) if (grid[y].every(Boolean)) full.push(y);
     if (full.length) {
@@ -474,7 +508,12 @@
   }
 
   function start() {
-    grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    // Browsers only allow sound after a click or key press, so audio is set up here.
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      audio.resume();
+    } catch {}
+    grid =Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     queue = []; held = null; canHold = true;
     score = 0; lines = 0; level = 1;
     over = false; paused = false; running = true; clearing = null; popups = []; dropTimer = 0;
