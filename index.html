@@ -60,10 +60,12 @@
     h1 { font-size: 22px; }
   }
   @media (hover: none) { .touch { display: flex; } }
+  .top { display: flex; align-items: center; gap: 14px; }
+  #muteBtn { background: var(--panel); color: var(--text); border: 1px solid var(--line); padding: 6px 12px; font-size: 14px; }
 </style>
 </head>
 <body>
-<h1>BLOCKFALL</h1>
+<div class="top"><h1>BLOCKFALL</h1><button id="muteBtn">♪ Music: On</button></div>
 <div class="game">
   <div class="side">
     <div class="box"><div class="label">Hold</div><canvas id="hold" width="96" height="72"></canvas></div>
@@ -71,7 +73,7 @@
     <div class="box"><div class="label">Best</div><div class="value" id="best">0</div></div>
     <div class="box keys">
       <b>← →</b> move<br><b>↑ / X</b> rotate<br><b>Z</b> rotate back<br><b>↓</b> soft drop<br>
-      <b>Space</b> hard drop<br><b>C</b> hold<br><b>P</b> pause
+      <b>Space</b> hard drop<br><b>C</b> hold<br><b>P</b> pause<br><b>M</b> music
     </div>
   </div>
   <div class="wrap">
@@ -106,6 +108,105 @@
   const holdCtx = document.getElementById('hold').getContext('2d');
   const nextCtx = document.getElementById('next').getContext('2d');
   const $ = id => document.getElementById(id);
+
+  // Original disco loop synthesized with Web Audio: four-on-the-floor kick, hats, claps,
+  // octave-bouncing bass and chord stabs over Am7 - Dm7 - G - Cmaj7.
+  const Music = (() => {
+    const BPM = 120, BEAT = 60 / BPM, STEP = BEAT / 4;
+    const PROG = [
+      { root: 45, chord: [57, 60, 64, 67] },
+      { root: 50, chord: [57, 62, 65, 69] },
+      { root: 43, chord: [55, 59, 62, 67] },
+      { root: 48, chord: [55, 60, 64, 67] },
+    ];
+    let ac, master, noise, timer, step = 0, nextTime = 0, t0 = 0, playing = false;
+    let muted = false;
+    try { muted = localStorage.getItem('blockfall-muted') === '1'; } catch {}
+
+    const freq = n => 440 * Math.pow(2, (n - 69) / 12);
+
+    function init() {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      master = ac.createGain();
+      master.gain.value = muted ? 0 : 0.35;
+      master.connect(ac.destination);
+      noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+      const d = noise.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+
+    function env(t, peak, decay) {
+      const g = ac.createGain();
+      g.gain.setValueAtTime(peak, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + decay);
+      g.connect(master);
+      return g;
+    }
+
+    function kick(t) {
+      const o = ac.createOscillator();
+      o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+      o.connect(env(t, 1, 0.3));
+      o.start(t); o.stop(t + 0.3);
+    }
+
+    function noiseHit(t, type, f, peak, decay) {
+      const src = ac.createBufferSource();
+      src.buffer = noise;
+      const filt = ac.createBiquadFilter();
+      filt.type = type; filt.frequency.value = f;
+      src.connect(filt); filt.connect(env(t, peak, decay));
+      src.start(t); src.stop(t + decay);
+    }
+
+    function tone(t, note, wave, cutoff, peak, decay) {
+      const o = ac.createOscillator();
+      o.type = wave; o.frequency.value = freq(note);
+      const filt = ac.createBiquadFilter();
+      filt.type = 'lowpass'; filt.frequency.value = cutoff;
+      o.connect(filt); filt.connect(env(t, peak, decay));
+      o.start(t); o.stop(t + decay);
+    }
+
+    function playStep(t, n) {
+      const s = n % 16, bar = PROG[Math.floor(n / 16) % PROG.length];
+      if (s % 4 === 0) kick(t);
+      if (s % 4 === 2) noiseHit(t, 'highpass', 7000, 0.25, 0.18);
+      else if (s % 2 === 1) noiseHit(t, 'highpass', 9000, 0.12, 0.04);
+      if (s === 4 || s === 12) noiseHit(t, 'bandpass', 1500, 0.6, 0.15);
+      if (s % 2 === 0) tone(t, bar.root + (s % 4 === 2 ? 12 : 0), 'sawtooth', 700, 0.25, STEP * 1.8);
+      if (s === 3 || s === 10) bar.chord.forEach(note => tone(t, note, 'sawtooth', 2200, 0.04, 0.3));
+    }
+
+    function schedule() {
+      while (nextTime < ac.currentTime + 0.12) {
+        playStep(nextTime, step);
+        nextTime += STEP; step++;
+      }
+    }
+
+    return {
+      start() {
+        if (!ac) init();
+        ac.resume();
+        if (playing) return;
+        playing = true; step = 0;
+        nextTime = t0 = ac.currentTime + 0.05;
+        timer = setInterval(schedule, 25);
+      },
+      stop() { playing = false; clearInterval(timer); },
+      // Current position in beats, used to sync the dancers and dance floor.
+      beat() { return playing ? Math.max(0, ac.currentTime - t0) / BEAT : performance.now() / 1000 / BEAT; },
+      toggleMute() {
+        muted = !muted;
+        if (master) master.gain.value = muted ? 0 : 0.35;
+        try { localStorage.setItem('blockfall-muted', muted ? '1' : '0'); } catch {}
+        return muted;
+      },
+      get muted() { return muted; },
+    };
+  })();
 
   let CELL = 30;
   function sizeBoard() {
@@ -265,9 +366,44 @@
     c.globalAlpha = 1;
   }
 
+  // Arm end points (relative to cell size) for four disco poses.
+  const POSES = [
+    [[-0.22, 0.58], [0.32, 0.06]],
+    [[-0.34, 0.32], [0.34, 0.32]],
+    [[-0.32, 0.06], [0.22, 0.58]],
+    [[-0.24, 0.08], [0.24, 0.08]],
+  ];
+
+  function drawDancer(c, x, y, s, frame) {
+    const cx = x + s / 2, sway = (frame % 2 ? 1 : -1) * s * 0.05;
+    const hipX = cx + sway, hipY = y + s * 0.62, neckY = y + s * 0.36;
+    c.strokeStyle = c.fillStyle = 'rgba(20, 10, 40, 0.85)';
+    c.lineWidth = Math.max(1.2, s * 0.08);
+    c.lineCap = c.lineJoin = 'round';
+    c.beginPath();
+    c.arc(cx + sway * 0.5, y + s * 0.23, s * 0.1, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.moveTo(cx, neckY); c.lineTo(hipX, hipY);
+    for (const [ax, ay] of POSES[frame]) { c.moveTo(cx, neckY + s * 0.03); c.lineTo(cx + ax * s, y + ay * s); }
+    c.moveTo(hipX, hipY); c.lineTo(cx - s * 0.18, y + s * 0.9);
+    c.moveTo(hipX, hipY);
+    if (frame % 2) c.lineTo(cx + s * 0.26, y + s * 0.8); else c.lineTo(cx + s * 0.18, y + s * 0.9);
+    c.stroke();
+  }
+
   function draw() {
     if (!grid) return;
     ctx.clearRect(0, 0, board.width, board.height);
+
+    // Flashing dance floor: a checkerboard of colored tiles that pulses on every beat.
+    const beat = Music.beat(), beatNum = Math.floor(beat), pulse = 1 - (beat - beatNum);
+    for (let y = 0; y < ROWS; y++)
+      for (let x = 0; x < COLS; x++) {
+        if (grid[y][x] || (x + y + beatNum) % 2) continue;
+        ctx.fillStyle = `hsla(${((x * 3 + y * 5 + beatNum * 7) % 12) * 30}, 90%, 55%, ${0.04 + 0.1 * pulse})`;
+        ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+      }
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     for (let x = 1; x < COLS; x++) { ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, board.height); ctx.stroke(); }
     for (let y = 1; y < ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(board.width, y * CELL); ctx.stroke(); }
@@ -287,8 +423,12 @@
         if (y + gy >= 0) ctx.strokeRect((x + cur.x) * CELL + 2.5, (y + gy) * CELL + 2.5, CELL - 5, CELL - 5);
       }
       ctx.globalAlpha = 1;
-      for (const [x, y] of cur.cells)
-        if (y + cur.y >= 0) drawCell(ctx, (x + cur.x) * CELL, (y + cur.y) * CELL, CELL, PIECES[cur.type].color);
+      cur.cells.forEach(([x, y], i) => {
+        if (y + cur.y < 0) return;
+        const px = (x + cur.x) * CELL, py = (y + cur.y) * CELL;
+        drawCell(ctx, px, py, CELL, PIECES[cur.type].color);
+        drawDancer(ctx, px, py, CELL, (Math.floor(beat * 2) + (i % 2) * 2) % 4);
+      });
     }
 
     drawMini(holdCtx, holdType ? [holdType] : [], 72, canHold ? 1 : 0.35);
@@ -346,10 +486,13 @@
     spawn();
     updateHud();
     $('overlay').classList.add('hidden');
+    Music.stop();
+    Music.start();
   }
 
   function gameOver() {
     over = true; running = false;
+    Music.stop();
     updateHud();
     showOverlay('GAME OVER', `Score: ${score}<br>Lines: ${lines}`, 'Play again');
   }
@@ -357,8 +500,8 @@
   function togglePause() {
     if (!running || over) return;
     paused = !paused;
-    if (paused) showOverlay('PAUSED', 'Press P or tap ❚❚ to resume', 'Resume');
-    else $('overlay').classList.add('hidden');
+    if (paused) { Music.stop(); showOverlay('PAUSED', 'Press P or tap ❚❚ to resume', 'Resume'); }
+    else { Music.start(); $('overlay').classList.add('hidden'); }
   }
 
   function act(a) {
@@ -380,7 +523,15 @@
     x: 'rotate', X: 'rotate', z: 'rotateBack', Z: 'rotateBack',
     ' ': 'drop', c: 'hold', C: 'hold', Shift: 'hold', p: 'pause', P: 'pause', Escape: 'pause',
   };
+  function toggleMute() {
+    $('muteBtn').textContent = Music.toggleMute() ? '♪ Music: Off' : '♪ Music: On';
+    $('muteBtn').blur();
+  }
+  $('muteBtn').textContent = Music.muted ? '♪ Music: Off' : '♪ Music: On';
+  $('muteBtn').addEventListener('click', toggleMute);
+
   document.addEventListener('keydown', e => {
+    if (e.key === 'm' || e.key === 'M') { toggleMute(); return; }
     if (e.key === 'Enter' && !$('overlay').classList.contains('hidden')) { $('startBtn').click(); return; }
     const a = KEYMAP[e.key];
     if (!a) return;
