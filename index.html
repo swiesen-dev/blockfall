@@ -41,7 +41,7 @@
   .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
   canvas { display: block; margin: 0 auto; }
   .box canvas { max-width: 100%; height: auto; }
-  #board { background: #e8f0e0; border: 4px solid var(--line); box-shadow: 4px 4px 0 rgba(0,0,0,0.4); }
+  #board { background: linear-gradient(180deg, #1a2230, #0d121a); border: 4px solid var(--line); box-shadow: 4px 4px 0 rgba(0,0,0,0.4); }
   .wrap { position: relative; }
   #overlay {
     position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -132,13 +132,13 @@
 
   // Each piece is a property group with its own color and icon.
   const PIECES = {
-    I: { color: '#2b7bb9', icon: 'bank',  cells: [[0,1],[1,1],[2,1],[3,1]] },
-    O: { color: '#e0a526', icon: 'house', cells: [[1,0],[2,0],[1,1],[2,1]] },
-    T: { color: '#8e44ad', icon: 'hotel', cells: [[1,0],[0,1],[1,1],[2,1]] },
-    S: { color: '#2e9e5b', icon: 'coin',  cells: [[1,0],[2,0],[0,1],[1,1]] },
-    Z: { color: '#d6453d', icon: 'die',   cells: [[0,0],[1,0],[1,1],[2,1]] },
-    J: { color: '#1f3a68', icon: 'key',   cells: [[0,0],[0,1],[1,1],[2,1]] },
-    L: { color: '#e07b24', icon: 'bag',   cells: [[2,0],[0,1],[1,1],[2,1]] },
+    I: { color: '#1e90ff', icon: 'bank',  cells: [[0,1],[1,1],[2,1],[3,1]] },
+    O: { color: '#ffc400', icon: 'house', cells: [[1,0],[2,0],[1,1],[2,1]] },
+    T: { color: '#b04dff', icon: 'hotel', cells: [[1,0],[0,1],[1,1],[2,1]] },
+    S: { color: '#16c76a', icon: 'coin',  cells: [[1,0],[2,0],[0,1],[1,1]] },
+    Z: { color: '#ff3b4e', icon: 'die',   cells: [[0,0],[1,0],[1,1],[2,1]] },
+    J: { color: '#3d63ff', icon: 'key',   cells: [[0,0],[0,1],[1,1],[2,1]] },
+    L: { color: '#ff8a1f', icon: 'bag',   cells: [[2,0],[0,1],[1,1],[2,1]] },
   };
   const SIZE = { I: 4, O: 4, T: 3, S: 3, Z: 3, J: 3, L: 3 };
 
@@ -263,7 +263,7 @@
     for (const [x, y] of cur.cells) {
       const gy = y + cur.y;
       if (gy < 0) { gameOver(); return; }
-      grid[gy][x + cur.x] = cur.type;
+      grid[gy][x + cur.x] = { type: cur.type, value: cur.value };
     }
     // Landed safely: bank the block's value, plus 1% interest on the existing balance.
     const interest = cents(score * INTEREST);
@@ -378,24 +378,78 @@
     c.fillText('$', cx, cy + s * 0.02);
   }
 
-  // A property tile: colored card with a bevel and the group's icon.
-  function drawCell(c, x, y, size, type, alpha = 1) {
+  // Lighten (amt > 0) or darken (amt < 0) a #rrggbb color.
+  function shade(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = [n >> 16, (n >> 8) & 255, n & 255].map(v =>
+      Math.round(amt > 0 ? v + (255 - v) * amt : v * (1 + amt)));
+    return `rgb(${ch.join(',')})`;
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  // A glossy 3D tile: drop shadow, vertical gradient body, dark rim, glassy highlight,
+  // the group's icon as a faint watermark and the block's dollar value on top.
+  function drawCell(c, x, y, size, type, alpha = 1, value) {
     const p = PIECES[type];
+    const pad = Math.max(1, size * 0.05), w = size - pad * 2, r = size * 0.2;
+    const x0 = x + pad, y0 = y + pad;
+    c.save();
     c.globalAlpha = alpha;
-    c.fillStyle = p.color;
-    c.fillRect(x + 1, y + 1, size - 2, size - 2);
-    c.fillStyle = 'rgba(255,255,255,0.22)';
-    c.fillRect(x + 1, y + 1, size - 2, Math.max(2, size * 0.12));
-    c.fillStyle = 'rgba(0,0,0,0.22)';
-    c.fillRect(x + 1, y + size - 1 - Math.max(2, size * 0.1), size - 2, Math.max(2, size * 0.1));
+
+    c.shadowColor = 'rgba(0,0,0,0.5)';
+    c.shadowBlur = size * 0.18;
+    c.shadowOffsetY = size * 0.08;
+    const body = c.createLinearGradient(0, y0, 0, y0 + w);
+    body.addColorStop(0, shade(p.color, 0.4));
+    body.addColorStop(0.45, p.color);
+    body.addColorStop(1, shade(p.color, -0.4));
+    c.fillStyle = body;
+    roundRect(c, x0, y0, w, w, r);
+    c.fill();
+    c.shadowColor = 'transparent';
+
+    c.strokeStyle = shade(p.color, -0.5);
+    c.lineWidth = Math.max(1, size * 0.04);
+    c.stroke();
+
+    const gloss = c.createLinearGradient(0, y0, 0, y0 + w * 0.5);
+    gloss.addColorStop(0, 'rgba(255,255,255,0.7)');
+    gloss.addColorStop(1, 'rgba(255,255,255,0.05)');
+    c.fillStyle = gloss;
+    roundRect(c, x0 + w * 0.1, y0 + w * 0.06, w * 0.8, w * 0.42, r * 0.8);
+    c.fill();
+
+    const showValue = value && size >= 18;
+    c.globalAlpha = alpha * (showValue ? 0.28 : 1);
     drawIcon(c, p.icon, x, y, size);
-    c.globalAlpha = 1;
+    c.globalAlpha = alpha;
+
+    if (showValue) {
+      const text = '$' + value;
+      c.font = `800 ${Math.round(size * (text.length > 3 ? 0.3 : 0.36))}px "Segoe UI", system-ui, sans-serif`;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.lineWidth = Math.max(2, size * 0.1);
+      c.strokeStyle = 'rgba(0,0,0,0.55)';
+      c.strokeText(text, x + size / 2, y + size * 0.54);
+      c.fillStyle = '#fff';
+      c.fillText(text, x + size / 2, y + size * 0.54);
+    }
+    c.restore();
   }
 
   function draw() {
     if (!grid) return;
     ctx.clearRect(0, 0, board.width, board.height);
-    ctx.strokeStyle = 'rgba(42,36,24,0.08)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     for (let x = 1; x < COLS; x++) { ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, board.height); ctx.stroke(); }
     for (let y = 1; y < ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(board.width, y * CELL); ctx.stroke(); }
 
@@ -409,7 +463,7 @@
             ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
             ctx.globalAlpha = 1;
           } else {
-            drawCell(ctx, x * CELL, y * CELL, CELL, grid[y][x]);
+            drawCell(ctx, x * CELL, y * CELL, CELL, grid[y][x].type, 1, grid[y][x].value);
           }
         }
 
@@ -422,8 +476,7 @@
         if (y + gy >= 0) ctx.strokeRect((x + cur.x) * CELL + 2.5, (y + gy) * CELL + 2.5, CELL - 5, CELL - 5);
       ctx.setLineDash([]);
       for (const [x, y] of cur.cells)
-        if (y + cur.y >= 0) drawCell(ctx, (x + cur.x) * CELL, (y + cur.y) * CELL, CELL, cur.type);
-      drawPriceTag();
+        if (y + cur.y >= 0) drawCell(ctx, (x + cur.x) * CELL, (y + cur.y) * CELL, CELL, cur.type, 1, cur.value);
     }
 
     ctx.font = `bold ${Math.max(13, Math.round(CELL * 0.6))}px Georgia, serif`;
@@ -440,26 +493,6 @@
 
     drawMini(holdCtx, held ? [held.type] : [], 72, canHold ? 1 : 0.35);
     drawMini(nextCtx, queue ? queue.slice(0, 3) : [], 66, 1);
-  }
-
-  // Gold price tag floating just above the falling piece showing what it's worth.
-  function drawPriceTag() {
-    const text = '$' + cur.value;
-    const xs = cur.cells.map(c => c[0] + cur.x);
-    const cx = (Math.min(...xs) + Math.max(...xs) + 1) / 2 * CELL;
-    const top = (cur.y + Math.min(...cur.cells.map(c => c[1]))) * CELL;
-    const fs = Math.max(11, Math.round(CELL * 0.5));
-    ctx.font = `bold ${fs}px Georgia, serif`;
-    const w = ctx.measureText(text).width + fs * 0.8, h = fs * 1.4;
-    const ty = Math.max(h / 2 + 2, top - h / 2 - 3);
-    ctx.fillStyle = '#e9b949';
-    ctx.strokeStyle = '#2a2418';
-    ctx.lineWidth = 2;
-    ctx.fillRect(cx - w / 2, ty - h / 2, w, h);
-    ctx.strokeRect(cx - w / 2, ty - h / 2, w, h);
-    ctx.fillStyle = '#2a2418';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, cx, ty + 1);
   }
 
   function drawMini(c, types, slot, alpha) {
