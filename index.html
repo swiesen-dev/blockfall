@@ -3,91 +3,97 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Blockfall</title>
+<title>Blockfall Tycoon</title>
 <style>
   :root {
-    --bg: #0f1020;
-    --panel: #181a33;
-    --line: #2a2d52;
-    --text: #e8e9ff;
-    --muted: #8f93c4;
-    --accent: #ffcf5c;
+    --bg: #0f3d2a;
+    --panel: #f4ecd4;
+    --line: #2a2418;
+    --text: #2a2418;
+    --muted: #6b5f45;
+    --accent: #c8102e;
+    --gold: #e9b949;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body {
-    background: radial-gradient(circle at 50% 0%, #1d2050 0%, var(--bg) 60%);
+    background: radial-gradient(circle at 50% 0%, #1b6b47 0%, var(--bg) 70%);
     color: var(--text);
-    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-family: Georgia, "Times New Roman", serif;
     display: flex; flex-direction: column; align-items: center;
     padding: 16px; touch-action: manipulation; user-select: none;
   }
-  h1 { margin: 4px 0 12px; font-size: 28px; letter-spacing: 6px; color: var(--accent); }
+  h1 {
+    margin: 4px 0 12px; font-size: 26px; letter-spacing: 4px; color: #fff;
+    background: var(--accent); padding: 6px 18px; border: 3px solid #fff;
+    box-shadow: 0 0 0 3px var(--accent); text-transform: uppercase;
+  }
   .game { display: flex; gap: 16px; align-items: flex-start; }
   .side { display: flex; flex-direction: column; gap: 12px; width: 120px; }
   .box {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-    padding: 10px; text-align: center;
+    background: var(--panel); border: 2px solid var(--line); border-radius: 4px;
+    padding: 8px; text-align: center; box-shadow: 3px 3px 0 rgba(0,0,0,0.35);
   }
-  .label { font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
-  .value { font-size: 22px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
-  canvas { display: block; }
-  #board { background: #0a0b18; border: 2px solid var(--line); border-radius: 8px; }
+  .label {
+    font-size: 11px; letter-spacing: 2px; color: #fff; text-transform: uppercase;
+    background: var(--line); margin: -8px -8px 6px; padding: 3px 0;
+  }
+  .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  canvas { display: block; margin: 0 auto; }
+  .box canvas { max-width: 100%; height: auto; }
+  #board { background: #e8f0e0; border: 4px solid var(--line); box-shadow: 4px 4px 0 rgba(0,0,0,0.4); }
   .wrap { position: relative; }
   #overlay {
     position: absolute; inset: 0; display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 12px;
-    background: rgba(10, 11, 24, 0.82); border-radius: 8px; text-align: center; padding: 16px;
+    background: rgba(15, 61, 42, 0.88); text-align: center; padding: 16px; color: #fff;
   }
   #overlay.hidden { display: none; }
-  #overlay h2 { margin: 0; font-size: 26px; color: var(--accent); }
-  #overlay p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  #overlay h2 { margin: 0; font-size: 26px; color: var(--gold); letter-spacing: 2px; }
+  #overlay p { margin: 0; color: #e6dcc0; font-size: 15px; line-height: 1.5; }
   button {
-    background: var(--accent); color: #1a1400; border: 0; border-radius: 8px;
-    padding: 10px 22px; font-size: 16px; font-weight: 700; cursor: pointer;
+    background: var(--accent); color: #fff; border: 2px solid #fff; border-radius: 4px;
+    padding: 10px 22px; font: 700 16px Georgia, serif; cursor: pointer; letter-spacing: 1px;
   }
   .keys { font-size: 12px; color: var(--muted); line-height: 1.7; text-align: left; }
-  .keys b { color: var(--text); font-weight: 600; }
+  .keys b { color: var(--text); }
   .touch { display: none; gap: 8px; margin-top: 14px; flex-wrap: wrap; justify-content: center; max-width: 360px; }
-  .touch button { background: var(--panel); color: var(--text); border: 1px solid var(--line); min-width: 64px; padding: 14px 0; font-size: 20px; }
+  .touch button { background: var(--panel); color: var(--text); border: 2px solid var(--line); min-width: 64px; padding: 14px 0; font-size: 20px; }
   @media (max-width: 560px) {
     .game { gap: 8px; }
-    .side { width: 72px; gap: 8px; }
-    .box { padding: 6px; }
-    .value { font-size: 16px; }
+    .side { width: 76px; gap: 8px; }
+    .value { font-size: 14px; }
     .keys { display: none; }
     .touch { display: flex; }
-    h1 { font-size: 22px; }
+    h1 { font-size: 18px; letter-spacing: 2px; }
   }
   @media (hover: none) { .touch { display: flex; } }
-  .top { display: flex; align-items: center; gap: 14px; }
-  #muteBtn { background: var(--panel); color: var(--text); border: 1px solid var(--line); padding: 6px 12px; font-size: 14px; }
 </style>
 </head>
 <body>
-<div class="top"><h1>BLOCKFALL</h1><button id="muteBtn">♪ Music: On</button></div>
+<h1>Blockfall Tycoon</h1>
 <div class="game">
   <div class="side">
-    <div class="box"><div class="label">Hold</div><canvas id="hold" width="96" height="72"></canvas></div>
-    <div class="box"><div class="label">Score</div><div class="value" id="score">0</div></div>
-    <div class="box"><div class="label">Best</div><div class="value" id="best">0</div></div>
+    <div class="box"><div class="label">Vault</div><canvas id="hold" width="96" height="72"></canvas></div>
+    <div class="box"><div class="label">Cash</div><div class="value" id="score">$0</div></div>
+    <div class="box"><div class="label">Record</div><div class="value" id="best">$0</div></div>
     <div class="box keys">
       <b>← →</b> move<br><b>↑ / X</b> rotate<br><b>Z</b> rotate back<br><b>↓</b> soft drop<br>
-      <b>Space</b> hard drop<br><b>C</b> hold<br><b>P</b> pause<br><b>M</b> music
+      <b>Space</b> hard drop<br><b>C</b> vault<br><b>P</b> pause
     </div>
   </div>
   <div class="wrap">
     <canvas id="board"></canvas>
     <div id="overlay">
-      <h2 id="ovTitle">BLOCKFALL</h2>
-      <p id="ovText">Stack the falling blocks.<br>Fill a row to clear it.</p>
-      <button id="startBtn">Play</button>
+      <h2 id="ovTitle">BLOCKFALL TYCOON</h2>
+      <p id="ovText">Build your property empire.<br>Complete a row to collect a payday!</p>
+      <button id="startBtn">Start Building</button>
     </div>
   </div>
   <div class="side">
     <div class="box"><div class="label">Next</div><canvas id="next" width="96" height="200"></canvas></div>
-    <div class="box"><div class="label">Level</div><div class="value" id="level">1</div></div>
-    <div class="box"><div class="label">Lines</div><div class="value" id="lines">0</div></div>
+    <div class="box"><div class="label">District</div><div class="value" id="level">1</div></div>
+    <div class="box"><div class="label">Streets</div><div class="value" id="lines">0</div></div>
   </div>
 </div>
 <div class="touch">
@@ -108,124 +114,27 @@
   const holdCtx = document.getElementById('hold').getContext('2d');
   const nextCtx = document.getElementById('next').getContext('2d');
   const $ = id => document.getElementById(id);
-
-  // Original disco loop synthesized with Web Audio: four-on-the-floor kick, hats, claps,
-  // octave-bouncing bass and chord stabs over Am7 - Dm7 - G - Cmaj7.
-  const Music = (() => {
-    const BPM = 120, BEAT = 60 / BPM, STEP = BEAT / 4;
-    const PROG = [
-      { root: 45, chord: [57, 60, 64, 67] },
-      { root: 50, chord: [57, 62, 65, 69] },
-      { root: 43, chord: [55, 59, 62, 67] },
-      { root: 48, chord: [55, 60, 64, 67] },
-    ];
-    let ac, master, noise, timer, step = 0, nextTime = 0, t0 = 0, playing = false;
-    let muted = false;
-    try { muted = localStorage.getItem('blockfall-muted') === '1'; } catch {}
-
-    const freq = n => 440 * Math.pow(2, (n - 69) / 12);
-
-    function init() {
-      ac = new (window.AudioContext || window.webkitAudioContext)();
-      master = ac.createGain();
-      master.gain.value = muted ? 0 : 0.35;
-      master.connect(ac.destination);
-      noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
-      const d = noise.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-
-    function env(t, peak, decay) {
-      const g = ac.createGain();
-      g.gain.setValueAtTime(peak, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + decay);
-      g.connect(master);
-      return g;
-    }
-
-    function kick(t) {
-      const o = ac.createOscillator();
-      o.frequency.setValueAtTime(150, t);
-      o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
-      o.connect(env(t, 1, 0.3));
-      o.start(t); o.stop(t + 0.3);
-    }
-
-    function noiseHit(t, type, f, peak, decay) {
-      const src = ac.createBufferSource();
-      src.buffer = noise;
-      const filt = ac.createBiquadFilter();
-      filt.type = type; filt.frequency.value = f;
-      src.connect(filt); filt.connect(env(t, peak, decay));
-      src.start(t); src.stop(t + decay);
-    }
-
-    function tone(t, note, wave, cutoff, peak, decay) {
-      const o = ac.createOscillator();
-      o.type = wave; o.frequency.value = freq(note);
-      const filt = ac.createBiquadFilter();
-      filt.type = 'lowpass'; filt.frequency.value = cutoff;
-      o.connect(filt); filt.connect(env(t, peak, decay));
-      o.start(t); o.stop(t + decay);
-    }
-
-    function playStep(t, n) {
-      const s = n % 16, bar = PROG[Math.floor(n / 16) % PROG.length];
-      if (s % 4 === 0) kick(t);
-      if (s % 4 === 2) noiseHit(t, 'highpass', 7000, 0.25, 0.18);
-      else if (s % 2 === 1) noiseHit(t, 'highpass', 9000, 0.12, 0.04);
-      if (s === 4 || s === 12) noiseHit(t, 'bandpass', 1500, 0.6, 0.15);
-      if (s % 2 === 0) tone(t, bar.root + (s % 4 === 2 ? 12 : 0), 'sawtooth', 700, 0.25, STEP * 1.8);
-      if (s === 3 || s === 10) bar.chord.forEach(note => tone(t, note, 'sawtooth', 2200, 0.04, 0.3));
-    }
-
-    function schedule() {
-      while (nextTime < ac.currentTime + 0.12) {
-        playStep(nextTime, step);
-        nextTime += STEP; step++;
-      }
-    }
-
-    return {
-      start() {
-        if (!ac) init();
-        ac.resume();
-        if (playing) return;
-        playing = true; step = 0;
-        nextTime = t0 = ac.currentTime + 0.05;
-        timer = setInterval(schedule, 25);
-      },
-      stop() { playing = false; clearInterval(timer); },
-      // Current position in beats, used to sync the dancers and dance floor.
-      beat() { return playing ? Math.max(0, ac.currentTime - t0) / BEAT : performance.now() / 1000 / BEAT; },
-      toggleMute() {
-        muted = !muted;
-        if (master) master.gain.value = muted ? 0 : 0.35;
-        try { localStorage.setItem('blockfall-muted', muted ? '1' : '0'); } catch {}
-        return muted;
-      },
-      get muted() { return muted; },
-    };
-  })();
+  const money = n => '$' + n.toLocaleString('en-US');
 
   let CELL = 30;
   function sizeBoard() {
     const maxH = window.innerHeight - 120;
-    const maxW = window.innerWidth - (window.innerWidth <= 560 ? 180 : 320);
+    const maxW = window.innerWidth - (window.innerWidth <= 560 ? 190 : 320);
     CELL = Math.max(14, Math.min(32, Math.floor(maxH / ROWS), Math.floor(maxW / COLS)));
     board.width = COLS * CELL;
     board.height = ROWS * CELL;
     draw();
   }
 
+  // Each piece is a property group with its own color and icon.
   const PIECES = {
-    I: { color: '#4fd8ff', cells: [[0,1],[1,1],[2,1],[3,1]] },
-    O: { color: '#ffd84f', cells: [[1,0],[2,0],[1,1],[2,1]] },
-    T: { color: '#c77dff', cells: [[1,0],[0,1],[1,1],[2,1]] },
-    S: { color: '#6eea7c', cells: [[1,0],[2,0],[0,1],[1,1]] },
-    Z: { color: '#ff5f6d', cells: [[0,0],[1,0],[1,1],[2,1]] },
-    J: { color: '#5b7cff', cells: [[0,0],[0,1],[1,1],[2,1]] },
-    L: { color: '#ff9f43', cells: [[2,0],[0,1],[1,1],[2,1]] },
+    I: { color: '#2b7bb9', icon: 'bank',  cells: [[0,1],[1,1],[2,1],[3,1]] },
+    O: { color: '#e0a526', icon: 'house', cells: [[1,0],[2,0],[1,1],[2,1]] },
+    T: { color: '#8e44ad', icon: 'hotel', cells: [[1,0],[0,1],[1,1],[2,1]] },
+    S: { color: '#2e9e5b', icon: 'coin',  cells: [[1,0],[2,0],[0,1],[1,1]] },
+    Z: { color: '#d6453d', icon: 'die',   cells: [[0,0],[1,0],[1,1],[2,1]] },
+    J: { color: '#1f3a68', icon: 'key',   cells: [[0,0],[0,1],[1,1],[2,1]] },
+    L: { color: '#e07b24', icon: 'bag',   cells: [[2,0],[0,1],[1,1],[2,1]] },
   };
   const SIZE = { I: 4, O: 4, T: 3, S: 3, Z: 3, J: 3, L: 3 };
 
@@ -240,10 +149,10 @@
 
   let grid, cur, holdType, canHold, queue, score, lines, level, best;
   let dropTimer = 0, lastTime = 0, running = false, paused = false, over = false;
-  let lockDelay = 0, clearing = null;
+  let lockDelay = 0, clearing = null, payday = null;
 
   try { best = +localStorage.getItem('blockfall-best') || 0; } catch { best = 0; }
-  $('best').textContent = best;
+  $('best').textContent = money(best);
 
   function bag() {
     const b = Object.keys(PIECES);
@@ -314,7 +223,7 @@
     for (const [x, y] of cur.cells) {
       const gy = y + cur.y;
       if (gy < 0) { gameOver(); return; }
-      grid[gy][x + cur.x] = PIECES[cur.type].color;
+      grid[gy][x + cur.x] = cur.type;
     }
     const full = [];
     for (let y = 0; y < ROWS; y++) if (grid[y].every(Boolean)) full.push(y);
@@ -337,74 +246,109 @@
       grid.splice(y, 1);
       grid.unshift(Array(COLS).fill(null));
     }
+    const earned = [0, 100, 300, 500, 800][rows.length] * level;
     lines += rows.length;
-    score += [0, 100, 300, 500, 800][rows.length] * level;
+    score += earned;
     level = Math.floor(lines / 10) + 1;
+    payday = { text: (rows.length === 4 ? 'JACKPOT! ' : 'PAYDAY! ') + '+' + money(earned), y: rows[0], t: 0 };
   }
 
   function speed() { return Math.max(60, 800 * Math.pow(0.82, level - 1)); }
 
   function updateHud() {
-    $('score').textContent = score;
+    $('score').textContent = money(score);
     $('lines').textContent = lines;
     $('level').textContent = level;
     if (score > best) {
       best = score;
-      $('best').textContent = best;
+      $('best').textContent = money(best);
       try { localStorage.setItem('blockfall-best', best); } catch {}
     }
   }
 
-  function drawCell(c, x, y, size, color, alpha = 1) {
-    c.globalAlpha = alpha;
-    c.fillStyle = color;
-    c.fillRect(x + 1, y + 1, size - 2, size - 2);
-    c.fillStyle = 'rgba(255,255,255,0.25)';
-    c.fillRect(x + 1, y + 1, size - 2, Math.max(2, size * 0.15));
-    c.fillStyle = 'rgba(0,0,0,0.2)';
-    c.fillRect(x + 1, y + size - 1 - Math.max(2, size * 0.12), size - 2, Math.max(2, size * 0.12));
-    c.globalAlpha = 1;
-  }
-
-  // Arm end points (relative to cell size) for four disco poses.
-  const POSES = [
-    [[-0.22, 0.58], [0.32, 0.06]],
-    [[-0.34, 0.32], [0.34, 0.32]],
-    [[-0.32, 0.06], [0.22, 0.58]],
-    [[-0.24, 0.08], [0.24, 0.08]],
-  ];
-
-  function drawDancer(c, x, y, s, frame) {
-    const cx = x + s / 2, sway = (frame % 2 ? 1 : -1) * s * 0.05;
-    const hipX = cx + sway, hipY = y + s * 0.62, neckY = y + s * 0.36;
-    c.strokeStyle = c.fillStyle = 'rgba(20, 10, 40, 0.85)';
-    c.lineWidth = Math.max(1.2, s * 0.08);
+  // Draws a small white icon centered in a cell of size s.
+  function drawIcon(c, icon, x, y, s) {
+    if (s < 12) return;
+    const cx = x + s / 2, cy = y + s / 2, u = s * 0.3;
+    c.fillStyle = c.strokeStyle = 'rgba(255,255,255,0.92)';
+    c.lineWidth = Math.max(1, s * 0.07);
     c.lineCap = c.lineJoin = 'round';
     c.beginPath();
-    c.arc(cx + sway * 0.5, y + s * 0.23, s * 0.1, 0, Math.PI * 2);
-    c.fill();
-    c.beginPath();
-    c.moveTo(cx, neckY); c.lineTo(hipX, hipY);
-    for (const [ax, ay] of POSES[frame]) { c.moveTo(cx, neckY + s * 0.03); c.lineTo(cx + ax * s, y + ay * s); }
-    c.moveTo(hipX, hipY); c.lineTo(cx - s * 0.18, y + s * 0.9);
-    c.moveTo(hipX, hipY);
-    if (frame % 2) c.lineTo(cx + s * 0.26, y + s * 0.8); else c.lineTo(cx + s * 0.18, y + s * 0.9);
-    c.stroke();
+    switch (icon) {
+      case 'house':
+        c.moveTo(cx - u, cy - u * 0.05); c.lineTo(cx, cy - u); c.lineTo(cx + u, cy - u * 0.05); c.closePath();
+        c.rect(cx - u * 0.7, cy - u * 0.05, u * 1.4, u);
+        c.fill();
+        c.fillStyle = 'rgba(0,0,0,0.35)';
+        c.fillRect(cx - u * 0.18, cy + u * 0.4, u * 0.36, u * 0.55);
+        break;
+      case 'hotel':
+        c.fillRect(cx - u * 0.6, cy - u, u * 1.2, u * 2);
+        c.fillStyle = 'rgba(0,0,0,0.35)';
+        for (let r = 0; r < 3; r++)
+          for (let k = 0; k < 2; k++)
+            c.fillRect(cx - u * 0.4 + k * u * 0.5, cy - u * 0.8 + r * u * 0.55, u * 0.3, u * 0.3);
+        break;
+      case 'bank':
+        c.moveTo(cx - u, cy - u * 0.45); c.lineTo(cx, cy - u); c.lineTo(cx + u, cy - u * 0.45); c.closePath();
+        c.fill();
+        for (let k = -1; k <= 1; k++) c.fillRect(cx + k * u * 0.6 - u * 0.13, cy - u * 0.35, u * 0.26, u * 1.05);
+        c.fillRect(cx - u, cy + u * 0.75, u * 2, u * 0.25);
+        break;
+      case 'coin':
+        c.arc(cx, cy, u, 0, Math.PI * 2);
+        c.fill();
+        drawDollar(c, cx, cy, s);
+        break;
+      case 'bag':
+        c.arc(cx, cy + u * 0.25, u * 0.8, 0, Math.PI * 2);
+        c.moveTo(cx - u * 0.35, cy - u); c.lineTo(cx + u * 0.35, cy - u); c.lineTo(cx, cy - u * 0.4); c.closePath();
+        c.fill();
+        drawDollar(c, cx, cy + u * 0.25, s * 0.85);
+        break;
+      case 'die':
+        c.rect(cx - u * 0.9, cy - u * 0.9, u * 1.8, u * 1.8);
+        c.fill();
+        c.fillStyle = 'rgba(0,0,0,0.6)';
+        for (const d of [-0.5, 0, 0.5]) {
+          c.beginPath(); c.arc(cx + d * u, cy + d * u, Math.max(1, u * 0.17), 0, Math.PI * 2); c.fill();
+        }
+        break;
+      case 'key':
+        c.arc(cx - u * 0.45, cy, u * 0.45, 0, Math.PI * 2);
+        c.moveTo(cx, cy); c.lineTo(cx + u, cy);
+        c.moveTo(cx + u * 0.75, cy); c.lineTo(cx + u * 0.75, cy + u * 0.4);
+        c.moveTo(cx + u * 0.45, cy); c.lineTo(cx + u * 0.45, cy + u * 0.3);
+        c.stroke();
+        break;
+    }
+  }
+
+  function drawDollar(c, cx, cy, s) {
+    c.fillStyle = 'rgba(0,0,0,0.55)';
+    c.font = `bold ${Math.round(s * 0.42)}px Georgia, serif`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('$', cx, cy + s * 0.02);
+  }
+
+  // A property tile: colored card with a bevel and the group's icon.
+  function drawCell(c, x, y, size, type, alpha = 1) {
+    const p = PIECES[type];
+    c.globalAlpha = alpha;
+    c.fillStyle = p.color;
+    c.fillRect(x + 1, y + 1, size - 2, size - 2);
+    c.fillStyle = 'rgba(255,255,255,0.22)';
+    c.fillRect(x + 1, y + 1, size - 2, Math.max(2, size * 0.12));
+    c.fillStyle = 'rgba(0,0,0,0.22)';
+    c.fillRect(x + 1, y + size - 1 - Math.max(2, size * 0.1), size - 2, Math.max(2, size * 0.1));
+    drawIcon(c, p.icon, x, y, size);
+    c.globalAlpha = 1;
   }
 
   function draw() {
     if (!grid) return;
     ctx.clearRect(0, 0, board.width, board.height);
-
-    // Flashing dance floor: a checkerboard of colored tiles that pulses on every beat.
-    const beat = Music.beat(), beatNum = Math.floor(beat), pulse = 1 - (beat - beatNum);
-    for (let y = 0; y < ROWS; y++)
-      for (let x = 0; x < COLS; x++) {
-        if (grid[y][x] || (x + y + beatNum) % 2) continue;
-        ctx.fillStyle = `hsla(${((x * 3 + y * 5 + beatNum * 7) % 12) * 30}, 90%, 55%, ${0.04 + 0.1 * pulse})`;
-        ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
-      }
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.strokeStyle = 'rgba(42,36,24,0.08)';
     for (let x = 1; x < COLS; x++) { ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, board.height); ctx.stroke(); }
     for (let y = 1; y < ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(board.width, y * CELL); ctx.stroke(); }
 
@@ -412,23 +356,39 @@
       for (let x = 0; x < COLS; x++)
         if (grid[y][x]) {
           const flash = clearing && clearing.rows.includes(y);
-          drawCell(ctx, x * CELL, y * CELL, CELL, flash ? '#ffffff' : grid[y][x], flash ? 1 - clearing.t / 250 : 1);
+          if (flash) {
+            ctx.globalAlpha = 1 - clearing.t / 300;
+            ctx.fillStyle = '#e9b949';
+            ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+            ctx.globalAlpha = 1;
+          } else {
+            drawCell(ctx, x * CELL, y * CELL, CELL, grid[y][x]);
+          }
         }
 
     if (cur) {
       const gy = ghostY();
       ctx.strokeStyle = PIECES[cur.type].color;
-      ctx.globalAlpha = 0.5;
-      for (const [x, y] of cur.cells) {
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      for (const [x, y] of cur.cells)
         if (y + gy >= 0) ctx.strokeRect((x + cur.x) * CELL + 2.5, (y + gy) * CELL + 2.5, CELL - 5, CELL - 5);
-      }
+      ctx.setLineDash([]);
+      for (const [x, y] of cur.cells)
+        if (y + cur.y >= 0) drawCell(ctx, (x + cur.x) * CELL, (y + cur.y) * CELL, CELL, cur.type);
+    }
+
+    if (payday) {
+      const a = Math.max(0, 1 - payday.t / 1200);
+      const py = payday.y * CELL - payday.t * 0.04;
+      ctx.globalAlpha = a;
+      ctx.font = `bold ${Math.max(14, Math.round(CELL * 0.75))}px Georgia, serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 4; ctx.strokeStyle = '#2a2418';
+      ctx.strokeText(payday.text, board.width / 2, py);
+      ctx.fillStyle = '#e9b949';
+      ctx.fillText(payday.text, board.width / 2, py);
       ctx.globalAlpha = 1;
-      cur.cells.forEach(([x, y], i) => {
-        if (y + cur.y < 0) return;
-        const px = (x + cur.x) * CELL, py = (y + cur.y) * CELL;
-        drawCell(ctx, px, py, CELL, PIECES[cur.type].color);
-        drawDancer(ctx, px, py, CELL, (Math.floor(beat * 2) + (i % 2) * 2) % 4);
-      });
     }
 
     drawMini(holdCtx, holdType ? [holdType] : [], 72, canHold ? 1 : 0.35);
@@ -445,7 +405,7 @@
       const h = (Math.max(...ys) - Math.min(...ys) + 1) * s;
       const ox = (c.canvas.width - w) / 2 - Math.min(...xs) * s;
       const oy = i * slot + (slot - h) / 2 - Math.min(...ys) * s;
-      for (const [x, y] of cells) drawCell(c, ox + x * s, oy + y * s, s, PIECES[t].color, alpha);
+      for (const [x, y] of cells) drawCell(c, ox + x * s, oy + y * s, s, t, alpha);
     });
   }
 
@@ -453,9 +413,10 @@
     const dt = Math.min(100, t - lastTime);
     lastTime = t;
     if (running && !paused && !over) {
+      if (payday) { payday.t += dt; if (payday.t > 1200) payday = null; }
       if (clearing) {
         clearing.t += dt;
-        if (clearing.t >= 250) { clearRows(clearing.rows); clearing = null; finishLock(); }
+        if (clearing.t >= 300) { clearRows(clearing.rows); clearing = null; finishLock(); }
       } else {
         dropTimer += dt;
         if (dropTimer >= speed()) {
@@ -482,26 +443,23 @@
     grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     queue = []; holdType = null; canHold = true;
     score = 0; lines = 0; level = 1;
-    over = false; paused = false; running = true; clearing = null; dropTimer = 0;
+    over = false; paused = false; running = true; clearing = null; payday = null; dropTimer = 0;
     spawn();
     updateHud();
     $('overlay').classList.add('hidden');
-    Music.stop();
-    Music.start();
   }
 
   function gameOver() {
     over = true; running = false;
-    Music.stop();
     updateHud();
-    showOverlay('GAME OVER', `Score: ${score}<br>Lines: ${lines}`, 'Play again');
+    showOverlay('BANKRUPT!', `Cash: ${money(score)}<br>Streets: ${lines}`, 'Play again');
   }
 
   function togglePause() {
     if (!running || over) return;
     paused = !paused;
-    if (paused) { Music.stop(); showOverlay('PAUSED', 'Press P or tap ❚❚ to resume', 'Resume'); }
-    else { Music.start(); $('overlay').classList.add('hidden'); }
+    if (paused) showOverlay('PAUSED', 'Press P or tap ❚❚ to resume', 'Resume');
+    else $('overlay').classList.add('hidden');
   }
 
   function act(a) {
@@ -523,15 +481,7 @@
     x: 'rotate', X: 'rotate', z: 'rotateBack', Z: 'rotateBack',
     ' ': 'drop', c: 'hold', C: 'hold', Shift: 'hold', p: 'pause', P: 'pause', Escape: 'pause',
   };
-  function toggleMute() {
-    $('muteBtn').textContent = Music.toggleMute() ? '♪ Music: Off' : '♪ Music: On';
-    $('muteBtn').blur();
-  }
-  $('muteBtn').textContent = Music.muted ? '♪ Music: Off' : '♪ Music: On';
-  $('muteBtn').addEventListener('click', toggleMute);
-
   document.addEventListener('keydown', e => {
-    if (e.key === 'm' || e.key === 'M') { toggleMute(); return; }
     if (e.key === 'Enter' && !$('overlay').classList.contains('hidden')) { $('startBtn').click(); return; }
     const a = KEYMAP[e.key];
     if (!a) return;
