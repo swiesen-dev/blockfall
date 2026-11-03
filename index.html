@@ -153,7 +153,7 @@
 
   let grid, cur, held, canHold, queue, score, lines, level, best;
   let dropTimer = 0, lastTime = 0, running = false, paused = false, over = false;
-  let lockDelay = 0, clearing = null, popups = [];
+  let lockDelay = 0, clearing = null, popups = [], pieceId = 0;
 
   // Synthesized cash-register "cha-ching" played when a block lands.
   let audio;
@@ -209,7 +209,7 @@
       while (queue.length < 7) queue.push(...bag());
       type = queue.shift();
     }
-    cur = { type, value: value || randomValue(), cells: PIECES[type].cells.map(c => [...c]), x: 3, y: type === 'I' ? -1 : 0 };
+    cur = { type, id: ++pieceId, value: value || randomValue(), cells: PIECES[type].cells.map(c => [...c]), x: 3, y: type === 'I' ? -1 : 0 };
     lockDelay = 0;
     if (collides(cur.cells, cur.x, cur.y)) gameOver();
   }
@@ -263,7 +263,7 @@
     for (const [x, y] of cur.cells) {
       const gy = y + cur.y;
       if (gy < 0) { gameOver(); return; }
-      grid[gy][x + cur.x] = { type: cur.type, value: cur.value };
+      grid[gy][x + cur.x] = { type: cur.type, value: cur.value, id: cur.id };
     }
     // Landed safely: bank the block's value, plus 1% interest on the existing balance.
     const interest = cents(score * INTEREST);
@@ -397,8 +397,8 @@
   }
 
   // A glossy 3D tile: drop shadow, vertical gradient body, dark rim, glassy highlight,
-  // the group's icon as a faint watermark and the block's dollar value on top.
-  function drawCell(c, x, y, size, type, alpha = 1, value) {
+  // and the group's icon.
+  function drawCell(c, x, y, size, type, alpha = 1) {
     const p = PIECES[type];
     const pad = Math.max(1, size * 0.05), w = size - pad * 2, r = size * 0.2;
     const x0 = x + pad, y0 = y + pad;
@@ -428,22 +428,32 @@
     roundRect(c, x0 + w * 0.1, y0 + w * 0.06, w * 0.8, w * 0.42, r * 0.8);
     c.fill();
 
-    const showValue = value && size >= 18;
-    c.globalAlpha = alpha * (showValue ? 0.28 : 1);
+    c.globalAlpha = alpha * 0.45;
     drawIcon(c, p.icon, x, y, size);
-    c.globalAlpha = alpha;
-
-    if (showValue) {
-      const text = '$' + value;
-      c.font = `800 ${Math.round(size * (text.length > 3 ? 0.3 : 0.36))}px "Segoe UI", system-ui, sans-serif`;
-      c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.lineWidth = Math.max(2, size * 0.1);
-      c.strokeStyle = 'rgba(0,0,0,0.55)';
-      c.strokeText(text, x + size / 2, y + size * 0.54);
-      c.fillStyle = '#fff';
-      c.fillText(text, x + size / 2, y + size * 0.54);
-    }
     c.restore();
+  }
+
+  // One large dollar label per block, centered on the square nearest the block's middle.
+  function drawValueLabel(value, cells) {
+    if (!cells.length) return;
+    const mx = cells.reduce((s, c) => s + c[0], 0) / cells.length;
+    const my = cells.reduce((s, c) => s + c[1], 0) / cells.length;
+    const [gx, gy] = cells.reduce((best, c) =>
+      Math.hypot(c[0] - mx, c[1] - my) < Math.hypot(best[0] - mx, best[1] - my) ? c : best);
+    const cx = (gx + 0.5) * CELL, cy = (gy + 0.5) * CELL;
+    const text = '$' + value;
+    const fs = Math.max(11, Math.round(CELL * 0.52));
+    ctx.font = `800 ${fs}px "Segoe UI", system-ui, sans-serif`;
+    const w = ctx.measureText(text).width + fs * 0.7, h = fs * 1.35;
+    ctx.fillStyle = 'rgba(10, 14, 22, 0.82)';
+    roundRect(ctx, cx - w / 2, cy - h / 2, w, h, h / 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffd34d';
+    ctx.lineWidth = Math.max(1, CELL * 0.05);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd34d';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, cx, cy + 1);
   }
 
   function draw() {
@@ -463,9 +473,22 @@
             ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
             ctx.globalAlpha = 1;
           } else {
-            drawCell(ctx, x * CELL, y * CELL, CELL, grid[y][x].type, 1, grid[y][x].value);
+            drawCell(ctx, x * CELL, y * CELL, CELL, grid[y][x].type);
           }
         }
+
+    // Group landed squares by the block they came from and label each block once.
+    const landed = new Map();
+    for (let y = 0; y < ROWS; y++) {
+      if (clearing && clearing.rows.includes(y)) continue;
+      for (let x = 0; x < COLS; x++) {
+        const cell = grid[y][x];
+        if (!cell) continue;
+        if (!landed.has(cell.id)) landed.set(cell.id, { value: cell.value, cells: [] });
+        landed.get(cell.id).cells.push([x, y]);
+      }
+    }
+    for (const b of landed.values()) drawValueLabel(b.value, b.cells);
 
     if (cur) {
       const gy = ghostY();
@@ -476,7 +499,8 @@
         if (y + gy >= 0) ctx.strokeRect((x + cur.x) * CELL + 2.5, (y + gy) * CELL + 2.5, CELL - 5, CELL - 5);
       ctx.setLineDash([]);
       for (const [x, y] of cur.cells)
-        if (y + cur.y >= 0) drawCell(ctx, (x + cur.x) * CELL, (y + cur.y) * CELL, CELL, cur.type, 1, cur.value);
+        if (y + cur.y >= 0) drawCell(ctx, (x + cur.x) * CELL, (y + cur.y) * CELL, CELL, cur.type);
+      drawValueLabel(cur.value, cur.cells.map(([x, y]) => [x + cur.x, y + cur.y]).filter(c => c[1] >= 0));
     }
 
     ctx.font = `bold ${Math.max(13, Math.round(CELL * 0.6))}px Georgia, serif`;
